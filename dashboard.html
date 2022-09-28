@@ -1,0 +1,282 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="node_modules/font-awesome/css/font-awesome.css" />
+    <title>Offline Storage App</title>
+    <link href='https://unpkg.com/boxicons@2.1.1/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="styles/style.css" />
+
+    <script src='node_modules/jquery/dist/jquery.js'></script>
+    <script src="node_modules/jquery-validation/dist/jquery.validate.js"></script>
+    <script src="scripts/websqldb.js"></script>
+    <script src="scripts/customerfunctions.js"></script>
+    <script>
+        var unit8Array = [];
+        var fileType = "";
+        $(() => {
+
+            query("SELECT * FROM products",[],
+            r=>{
+                if(r.length >0){
+                    
+                    $('#tbl-products tbody').empty();
+                    for(var i=0; i< r.length; i++){
+                        $('#tbl-products tbody').append(`<tr>
+                            <td align='center'><img title="pic"  class='pic' style='width:80px;height:40px' id='p_${r.item(i).productid}' /></td>
+                                <td>${r.item(i).productname}</td>
+                                <td>${r.item(i).price.toFixed(2)}</td>
+                                <td>${r.item(i).description}</td>
+                            </tr>`);
+                            unit8ArrayToPicture(`p_${r.item(i).productid}`, r.item(i).picture, r.item(i).pictype);
+                    }
+                }
+            },
+            err=>{
+                $('#alert-msg').html('Error loading product data');
+                $('.alert').show();
+            });
+
+
+            $('#product-btn').click(() => {
+                var validator = $('#product-frm').validate();
+               
+                    if(unit8Array.length == 0)
+                    {
+                        $('#alert-msg').html('Select or drop a picture');
+                        $('.alert').show();
+                    }
+                if ($('#product-frm').valid()) {
+                    let data = [$('#pn').val(), $('#pp').val(), $('#pd').val(), unit8Array, fileType];
+                    let sql = "INSERT INTO products (productname, price, description, picture, pictype) VALUES (?, ?, ?, ?, ?)";
+                    nonQuery(sql, data,
+                    r=>{
+                        console.log(r);
+                        if(r.rowsAffected> 0){
+                            $('#alert-msg').html('Data inserted');
+                            $('.alert').show();
+                          window.location.reload();
+                        }
+                        else {
+                            $('#alert-msg').html('Something wror happened.');
+                            $('.alert').show();
+                        }
+                    },
+                    err=>{
+                        $('#alert-msg').html(err);
+                        $('.alert').show();
+                    });
+                }
+            });
+            $('#pi').change(() => {
+                fileType = document.getElementById('pi').files[0].type;
+                fileToUnit8Array(document.getElementById('pi').files[0])
+            });
+            var div = $("#drop");
+            div.on("dragenter", evt => {
+
+                evt.preventDefault();
+            });
+            div.on("dragover", evt => {
+                evt.preventDefault();
+            });
+            div.on("drop", evt => {
+                var files = evt.originalEvent.dataTransfer.files;
+                
+                fileType = files[0].type;
+                fileToUnit8Array(files[0])
+                evt.preventDefault();
+            });
+        });
+        function fileToUnit8Array(f) {
+            var reader = new FileReader();
+            reader.readAsArrayBuffer(f);
+            reader.onloadend = function (evt) {
+                if (evt.target.readyState == FileReader.DONE) {
+                    var arrayBuffer = evt.target.result,
+                        array = new Uint8Array(arrayBuffer);
+                    for (var i = 0; i < array.length; i++) {
+                        unit8Array.push(array[i]);
+                    }
+
+                }
+            }
+        }
+        function unit8ArrayToPicture(id, bytes, type) {
+            
+            const content = new Uint8Array(bytes.split(','));
+            document.getElementById(id).src = URL.createObjectURL(
+                new Blob([content.buffer], { type: type } /* (1) */)
+            );
+        }
+        function appendToTable(id, name, price,description, bytes, type){
+            $('#tbl-products tbody').append(`<tr>
+                            <td align='center'><img title="pic"  class='pic' style='width:80px;height:40px' id='p_${id}' /></td>
+                                <td>${name}</td>
+                                <td>${price}</td>
+                                <td>${description}</td>
+                            </tr>`);
+                            unit8ArrayToPicture(`p_${id}`, bytes, type);
+        }
+
+    </script>
+
+<body>
+
+    <body>
+        <nav class="sidebar close">
+            <header>
+                <div class="image-text">
+                    <span class="image">
+                        <img src="images/logo.png" alt="">
+                    </span>
+
+                    <div class="text logo-text">
+                        <span class="name">eShop</span>
+                        <span class="profession"></span>
+                    </div>
+                </div>
+
+                <i class='bx bx-chevron-right toggle'></i>
+            </header>
+
+            <div class="menu-bar">
+                <div class="menu">
+
+                    <!-- <li class="search-box">
+                                                                            <i class='fa fa-search icon'></i>
+                                                                            <input type="text" placeholder="Search...">-->
+                    </li>
+
+                    <ul class="menu-links">
+                        <li class="nav-link">
+                            <a href="index.html">
+                                <i class='bx bx-home-alt icon'></i>
+                                <span class="text nav-text">Home</span>
+                            </a>
+
+                        </li>
+
+
+
+                    </ul>
+                </div>
+
+                <div class="bottom-content">
+                   
+
+                    <li class="mode">
+                        <div class="sun-moon">
+                            <i class='bx bx-moon icon moon'></i>
+                            <i class='bx bx-sun icon sun'></i>
+                        </div>
+                        <span class="mode-text text">Dark mode</span>
+
+                        <div class="toggle-switch">
+                            <span class="switch"></span>
+                        </div>
+                    </li>
+
+                </div>
+            </div>
+
+        </nav>
+
+        <section class="home">
+            <div class="top-bar">
+                <div class="text">
+                    Mobile Shop
+                </div>
+                
+            </div>
+            <div class="alert" style="display: none">
+                <span class="closebtn" onclick="this.parentElement.style.display='none';">&times;</span>
+                <div id="alert-msg">
+                    Message
+                </div>
+            </div>
+            <form id="product-frm" class="padded">
+                <div class="medium-text mb-1">
+                    Add new product
+                </div>
+                <div class="mb-1">
+                    <input id="pn" name="pn" class="input" placeholder="Product name..." required="" />
+                </div>
+                <div class="mb-1">
+                    <input type="text" name="pp" required id="pp" class="input" placeholder="Price..." />
+                </div>
+                <div class="mb-1">
+                    <textarea required id="pd" name="pd" class="input" placeholder="Description..."
+                        style="height: 60px;"></textarea>
+                </div>
+
+                <div class="mb-1">
+                    <input type="file" id="pi" name="pi" class="input" placeholder="Produc picture">
+                </div>
+                <div class="mb-1">
+                    <div class="drop">Drop picture here</div>
+                </div>
+                <div class="mb-1">
+                    <button type="button" id="product-btn" class="button">Save product</button>
+                </div>
+            </form>
+            <div class="padded">
+                <table id="tbl-products" class="table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Description</th>
+                            
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <script>
+            const body = document.querySelector('body'),
+                sidebar = body.querySelector('nav'),
+                toggle = body.querySelector(".toggle"),
+
+                modeSwitch = body.querySelector(".toggle-switch"),
+                modeText = body.querySelector(".mode-text");
+
+
+            toggle.addEventListener("click", () => {
+                sidebar.classList.toggle("close");
+            })
+
+
+
+            modeSwitch.addEventListener("click", () => {
+                body.classList.toggle("dark");
+
+                if (body.classList.contains("dark")) {
+                    modeText.innerText = "Light mode";
+                } else {
+                    modeText.innerText = "Dark mode";
+
+                }
+            });
+        </script>
+
+
+
+
+    </body>
+    </head>
+
+</html>

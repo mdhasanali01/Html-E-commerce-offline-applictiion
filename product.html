@@ -1,0 +1,387 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="node_modules/font-awesome/css/font-awesome.css" />
+    <title>Offline Storage App</title>
+    <link href='https://unpkg.com/boxicons@2.1.1/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="styles/style.css" />
+
+    <script src='node_modules/jquery/dist/jquery.js'></script>
+    <script src="node_modules/jquery-validation/dist/jquery.validate.js"></script>
+    <script src="scripts/websqldb.js"></script>
+    <script src="scripts/customerfunctions.js"></script>
+    <script>
+        $(() => {
+        
+            createTable(
+                `CREATE TABLE IF NOT EXISTS customers (
+                customerid INTEGER PRIMARY KEY AUTOINCREMENT,
+                customername VARCHAR(30),
+                phone VARCHAR(20),
+                email VARCHAR(50),
+                address VARCHAR(100)
+                )`,
+                r => {
+                    console.log(r);
+                });
+            createTable(
+                `CREATE TABLE IF NOT EXISTS products
+                (
+                productid INTEGER PRIMARY KEY AUTOINCREMENT,
+                productname VARCHAR(30),
+                price REAL,
+                description VARCHAR(150),
+                picture BLOB,
+                pictype VARCHAR(50)
+                )`,
+                r => {
+                    console.log(r);
+                });
+            createTable(
+                `CREATE TABLE IF NOT EXISTS orders
+                (
+                orderid INTEGER PRIMARY KEY AUTOINCREMENT,
+                orderdate DATETIME,
+                productid INTEGER REFERENCES products(productid),
+                customerid INTEGER REFERENCES customes (customerid),
+                quantity INTEGER,
+                status VARCHAR(20)
+                )`,
+                r => {
+                    console.log(r);
+                });
+            query("SELECT * FROM products", [],
+                r => {
+                    console.log(r)
+                    for (var i = 0; i < r.length; i++) {
+                        $('.gallery').append(`
+                        <div class="card">
+                            <img src="images/img_avatar.png" alt="Avatar" id="prod_${r.item(i).productid}">
+                            <div class="container">
+                            <h4><b>${r.item(i).productname}</b></h4>
+                            <h4 style='text-align:right'>${r.item(i).price.toFixed(2)}</h4>
+                            <div>${r.item(i).description}</p>
+                            <div><button type="button" class="button add-cart" style="border:solid 1px #ccc" data-id="${r.item(i).productid}" data-name="${r.item(i).productname}" data-price="${r.item(i).price}" class="button">Add to Cart</button></div>
+                            </div>
+                        </div>`);
+                        unit8ArrayToPicture(`prod_${r.item(i).productid}`, r.item(i).picture, r.item(i).pictype);
+                    }
+                },
+                err => {
+                    $('#alert-msg').html(err);
+                    $('.alert').show();
+                });
+                $('#register-frm').hide();
+            if (!checkLogin()) {
+                
+                $('#cart-box').hide();
+                $('#cart-li').hide();
+            }
+            else {
+                $('#register').hide();
+                        $('#cart-box').show();
+                        $('#cart-li').show();
+                        showCartSummary();
+            }
+            $('#loginbtn').click(() => {
+                console.log($('#email').val());
+                signIn($('#email').val(),
+                    r => {
+                        if (r.success) {
+                            $('#register').hide();
+                            $('#cart-box').show();
+                            $('#cart-li').show();
+                            showCartSummary();
+                        }
+                        else {
+                            $('#alert-msg').html('Email might be wrong');
+                            $('.alert').show();
+                        }
+                    },
+                    err => {
+                        console.log(err);
+                    });
+            });
+            $('#reg-link').click(ev => {
+                console.log('click')
+                ev.preventDefault();
+                $('#register-frm').show();
+            });
+            $('#reg-btn').click(() => {
+
+                if ($('#register-frm').valid()) {
+                    register($('#cn').val(), $('#cp').val(), $('#ce').val(), $('#ca').val(),
+                        r => {
+                            
+                            if (r.rowsAffected > 0) {
+                                $('#register-frm').hide();
+                                saveLoginData(r.insertId, $('#cn').val());
+                                
+                            } else {
+                                $('#alert-msg').html('Something went wrong');
+                                $('.alert').show();
+                            }
+
+                        },
+                        err => {
+                            console.log(err);
+                            $('#alert-msg').html(err);
+                            $('.alert').show();
+                        });
+                }
+            });
+            $('#dash-link').click(ev => {
+                ev.preventDefault();
+                $('#pass-frm').show();
+            });
+            $('#ap-btn').click(() => {
+                if ($('#pass-frm').valid()) {
+                    if ($('#ap').val() == '1234') {
+                        window.location.href = "/dashboard.html";
+                    }
+                }
+            });
+            $('#cancel-reg-btn').click(() => {
+                $('#register-frm').hide();
+            });
+            $('#cancel-ap-btn').click(() => {
+                $('#pass-frm').hide();
+            });
+            $("#cart-box").click(()=>{
+                window.location.href = "/cart.html";
+            });
+            $(document.body).on('click', '.add-cart', function (ev) {
+                if (!checkLogin()) {
+                    $('#alert-msg').html('Must login to buy');
+                    $('.alert').show();
+                    return;
+                }
+                let id = $(this).data('id');
+                let name = $(this).data('name');
+                let price = $(this).data('price');
+                let cart = localStorage.getItem('cart');
+                if (cart == null) cart = { items: [] };
+                else cart = JSON.parse(cart);
+                let item = cart.items.find(c => c.id == id);
+                if (item) item.qty += 1;
+                else cart.items.push({ id: id, name: name, price: price, qty: 1 });
+                localStorage.setItem('cart', JSON.stringify(cart));
+                showCartSummary();
+            });
+        });
+
+        function unit8ArrayToPicture(id, bytes, type) {
+            //console.log( bytes.split(','));
+            const content = new Uint8Array(bytes.split(','));
+            document.getElementById(id).src = URL.createObjectURL(
+                new Blob([content.buffer], { type: type } /* (1) */)
+            );
+        }
+        function showCartSummary() {
+            let cart = localStorage.getItem('cart');
+            if (cart != null) {
+                cart = JSON.parse(cart);
+                let q = 0;
+                cart.items.forEach(x => {
+                    q += x.qty
+                    console.log(x.qty);
+                });
+                $("#count").html(q);
+            }
+        }
+    </script>
+
+<body>
+
+    <body>
+        <nav class="sidebar close">
+            <header>
+                <div class="image-text">
+                    <span class="image">
+                        <img src="images/logo.png" alt="">
+                    </span>
+
+                    <div class="text logo-text">
+                        <span class="name">Mobile Shop</span>
+                        <span class="profession"></span>
+                    </div>
+                </div>
+
+                <i class='bx bx-chevron-right toggle'></i>
+            </header>
+
+            <div class="menu-bar">
+                <div class="menu">
+
+                    <!-- <li class="search-box">
+                                                                            <i class='fa fa-search icon'></i>
+                                                                            <input type="text" placeholder="Search...">-->
+                    </li>
+                    <li class="login-box" id="login">
+                        <i class="icon"><i class="fa fa-at" aria-hidden="true"></i></i>
+                        <input type="text" id="email" placeholder="Email...">
+                        <i id="loginbtn" class='fa fa-sign-in icon'></i>
+                    </li>
+                    <ul class="menu-links">
+                        <li class="nav-link">
+                            <a href="index.html">
+                                <i class='bx bx-home-alt icon'></i>
+                                <span class="text nav-text">Home</span>
+                            </a>
+                        </li>
+                        <li class="nav-link">
+                            <a href="dashboard.html" id="dash-link">
+                                <i class='bx bxs-dashboard icon'></i>
+                                <span class="text nav-text">Dashboard</span>
+                            </a>
+                        </li>
+
+                        <li class="nav-link" id="register">
+                            <a href="#" id="reg-link">
+                                <i class="fa fa-user-o icon" aria-hidden="true"></i>
+                                <span class="text nav-text">Register</span>
+                            </a>
+                        </li>
+
+                        <li class="nav-link">
+                            <a href="product.html">
+                                <i class='bx bx-category-alt icon'></i>
+                                <span class="text nav-text">Products</span>
+                            </a>
+                        </li>
+                        <li class="nav-link" id="cart-li">
+                            <a href="cart.html" id="cart-link">
+                                <i class='bx bx-cart icon'></i>
+                                <span class="text nav-text">Cart</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="bottom-content">
+                    
+
+                    <li class="mode">
+                        <div class="sun-moon">
+                            <i class='bx bx-moon icon moon'></i>
+                            <i class='bx bx-sun icon sun'></i>
+                        </div>
+                        <span class="mode-text text">Dark mode</span>
+
+                        <div class="toggle-switch">
+                            <span class="switch"></span>
+                        </div>
+                    </li>
+
+                </div>
+            </div>
+
+        </nav>
+
+        <section class="home">
+            <div class="top-bar">
+                <div class="text">
+                    Mobile Shop
+                </div>
+                <div id="cart-box" class="medium-text">
+                    <i class="fa fa-shopping-cart" aria-hidden="true"></i> <span id="count">0</span> <span>items</span>
+                </div>
+            </div>
+            <div class="alert" style="display: none">
+                <span class="closebtn" onclick="this.parentElement.style.display='none';">&times;</span>
+                <div id="alert-msg">
+                    Message
+                </div>
+            </div>
+            <form id="register-frm" class="padded">
+                <div class="medium-text mb-1">
+                    Register
+                </div>
+                <div class="mb-1">
+                    <input id="cn" name="cn" class="input" placeholder="Customer name..." required="" />
+                </div>
+                <div class="mb-1">
+                    <input type="email" name="ce" required id="ce" class="input" placeholder="Email..." />
+                </div>
+                <div class="mb-1">
+                    <input required id="cp" name="cp" class="input" placeholder="Phone..." />
+                </div>
+                <div class="mb-1">
+                    <input required id="ca" name="ca" class="input" placeholder="Address..." />
+                </div>
+                <div class="mb-1">
+                    <button type="button" id="reg-btn" class="button">Register</button>
+                </div>
+                <div class="mb-1">
+                    <button type="button" id="cancel-reg-btn" class="button"
+                        style="background-color: rgb(109, 104, 104); color: #fff;">Cancel</button>
+                </div>
+            </form>
+            <form id="pass-frm" class="padded" style="display: none;">
+                <div class="medium-text mb-1">
+                    Admin passkey
+                </div>
+                <div class="mb-1">
+                    <input type="password" id="ap" name="ap" class="input" placeholder="Admin passkey..." required />
+                </div>
+                <div class="mb-1">
+                    <button type="button" id="ap-btn" class="button">Go</button>
+                </div>
+                <div class="mb-1">
+                    <button type="button" id="cancel-ap-btn" class="button"
+                        style="background-color: rgb(109, 104, 104); color: #fff;">Cancel</button>
+                </div>
+            </form>
+            <div class="padded">
+                <h2>Products</h2>
+            </div>
+            <div class="padded gallery">
+
+
+            </div>
+
+        </section>
+
+        <script>
+            const body = document.querySelector('body'),
+                sidebar = body.querySelector('nav'),
+                toggle = body.querySelector(".toggle"),
+                loginBtn = body.querySelector(".login-box"),
+                modeSwitch = body.querySelector(".toggle-switch"),
+                modeText = body.querySelector(".mode-text");
+            toggle.addEventListener("click", () => {
+                sidebar.classList.toggle("close");
+            })
+
+            loginBtn.addEventListener("click", () => {
+                sidebar.classList.remove("close");
+            })
+
+            modeSwitch.addEventListener("click", () => {
+                body.classList.toggle("dark");
+
+                if (body.classList.contains("dark")) {
+                    modeText.innerText = "Light mode";
+                } else {
+                    modeText.innerText = "Dark mode";
+
+                }
+            });
+        </script>
+
+
+
+
+    </body>
+    </head>
+
+</html>

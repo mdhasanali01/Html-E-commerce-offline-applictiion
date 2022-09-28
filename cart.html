@@ -1,0 +1,232 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="node_modules/font-awesome/css/font-awesome.css" />
+    <title>Offline Storage App</title>
+    <link href='https://unpkg.com/boxicons@2.1.1/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="styles/style.css" />
+
+    <script src='node_modules/jquery/dist/jquery.js'></script>
+    <script src="node_modules/jquery-validation/dist/jquery.validate.js"></script>
+    <script src="scripts/websqldb.js"></script>
+    <script src="scripts/customerfunctions.js"></script>
+    <script>
+
+
+        $(() => {
+            var cart = localStorage.getItem('cart');
+            if (cart) {
+                cart = JSON.parse(cart);
+                let total = 0;
+                console.log(cart);
+                cart.items.forEach(item => {
+                    total += item.price * item.qty;
+                    $('#tbl-cart tbody').append(`<tr>
+                        
+                                                        <td>${item.name}</td>
+                                                        <td>${item.price}</td>
+                                                        <td><input class="form-control form-control-sm" style='width:60px;' id='q_${item.id}' type='number' value='${item.qty}' /></td>
+                                                        <td>${(item.price * item.qty).toFixed(2)}</td>
+                                                        <td><button class='button cart-update' data-id='${item.id}'><i class='bx bx-save'></i></button></td>
+                                                    </tr>`);
+                });
+                $('#tbl-cart').append(`<tr>
+                                            <th colspan='3' class='text-end'>Total: </th>
+                                            <td>${total.toFixed(2)}</td>
+                                        </tr>`);
+            }
+            $(document.body).on('click', '.cart-update', function (ev) {
+
+                let id = $(this).data('id');
+                var cart = localStorage.getItem('cart');
+                if (cart != null) {
+                    cart = JSON.parse(cart);
+                    console.log(cart);
+                    let index = cart.items.findIndex(x => x.id == id);
+                    if (index >= 0) {
+                        let q = Number($('#q_' + id).val());
+                        if (q <= 0) {
+                            cart.items.splice(index, 1);
+                            $(this).parent().parent().remove();
+                            
+                        } else {
+                            cart.items[index].qty = q;
+                        }
+
+                    }
+                    localStorage.setItem('cart', JSON.stringify(cart));
+                   
+                }
+
+            });
+            $('#checkout').click(() => {
+
+                var cart = localStorage.getItem('cart');
+                    if (cart != null) {
+                        cart = JSON.parse(cart);
+                        cart.items.forEach(x => {
+                            let sql = "INSERT INTO orders  (orderdate, customerid, productid,quantity) VALUES (?,?, ?, ?)";
+                                let cid = sessionStorage.getItem('customer-id');
+                            let pid = x.id;
+                            let q = x.qty;
+                            let d = formatDate(new Date());
+                            query([d, cid, pid, q],
+                            r=>{
+
+                            },
+                            err=>{
+
+                            });
+                        });
+                    }
+            });
+        });
+        function formatDate(d) {
+            return [
+                d.getFullYear(),
+                (d.getMonth() + 1).toString().padStart(2, '0'),
+                d.getDate().toString().padStart(2, '0')
+            ].join('-');
+        }
+    </script>
+
+<body>
+
+    <body>
+        <nav class="sidebar close">
+            <header>
+                <div class="image-text">
+                    <span class="image">
+                        <img src="images/logo.png" alt="">
+                    </span>
+
+                    <div class="text logo-text">
+                        <span class="name">Mobile Shop</span>
+                        <span class="profession"></span>
+                    </div>
+                </div>
+
+                <i class='bx bx-chevron-right toggle'></i>
+            </header>
+
+            <div class="menu-bar">
+                <div class="menu">
+
+
+                    </li>
+
+                    <ul class="menu-links">
+                        <li class="nav-link">
+                            <a href="index.html">
+                                <i class='bx bx-home-alt icon'></i>
+                                <span class="text nav-text">Home</span>
+                            </a>
+
+                        </li>
+
+
+
+                    </ul>
+                </div>
+
+                <div class="bottom-content">
+                    
+
+                    <li class="mode">
+                        <div class="sun-moon">
+                            <i class='bx bx-moon icon moon'></i>
+                            <i class='bx bx-sun icon sun'></i>
+                        </div>
+                        <span class="mode-text text">Dark mode</span>
+
+                        <div class="toggle-switch">
+                            <span class="switch"></span>
+                        </div>
+                    </li>
+
+                </div>
+            </div>
+
+        </nav>
+
+        <section class="home">
+            <div class="top-bar">
+                <div class="text">
+                    Mobile Shop
+                </div>
+
+            </div>
+            <div class="alert" style="display: none">
+                <span class="closebtn" onclick="this.parentElement.style.display='none';">&times;</span>
+                <div id="alert-msg">
+                    Message
+                </div>
+            </div>
+
+            <div class="padded">
+                <h2>Your cart</h2>
+                <table id="tbl-cart" class="table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Price</th>
+                            <th>Quantity</th>
+                            <th>Sub total</th>
+                            <th>..</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                    </tbody>
+                </table>
+            </div>
+            <div class="padded">
+               
+                    <button class="button" id="checkout">Checkout</button>
+               
+            </div>
+        </section>
+
+        <script>
+            const body = document.querySelector('body'),
+                sidebar = body.querySelector('nav'),
+                toggle = body.querySelector(".toggle"),
+
+                modeSwitch = body.querySelector(".toggle-switch"),
+                modeText = body.querySelector(".mode-text");
+
+
+            toggle.addEventListener("click", () => {
+                sidebar.classList.toggle("close");
+            })
+
+
+
+            modeSwitch.addEventListener("click", () => {
+                body.classList.toggle("dark");
+
+                if (body.classList.contains("dark")) {
+                    modeText.innerText = "Light mode";
+                } else {
+                    modeText.innerText = "Dark mode";
+
+                }
+            });
+        </script>
+
+
+
+
+    </body>
+    </head>
+
+</html>
